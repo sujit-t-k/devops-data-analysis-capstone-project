@@ -1,0 +1,24 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IDE files ###
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+### Secrets and Config Files ###
+*.env
+!*.env.example
+*.p8
+*.pub
+*.key
+*.pem
+
+### Logs ###
+*.log
+

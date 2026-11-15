@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LogPulse - End-to-End Architecture Diagram</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 30px;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      color: #38bdf8;
+      margin-bottom: 8px;
+    }
+    p {
+      color: #94a3b8;
+      margin-top: 0;
+      margin-bottom: 24px;
+    }
+    .diagram-container {
+      background-color: #1e293b;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+      border: 1px solid #334155;
+      max-width: 95%;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>LogPulse System Architecture</h1>
+  <p>End-to-End Application Log Observability, Edge Correlation, Cloud Data Warehousing & Analytics</p>
+  
+  <div class="diagram-container">
+    <pre class="mermaid">
+flowchart TD
+    subgraph ClientLayer ["1. Edge / Client Interaction"]
+        Client["Client / Postman"]
+    end
+
+    subgraph OrderEC2 ["2. aji-orders-ec2 (Elastic IP: 13.61.41.57)"]
+        Nginx["Nginx Reverse Proxy (:80)<br/>• Maps/Generates X-Correlation-ID<br/>• Emits access.jsonl"]
+        OrdersApp["Orders Spring Boot Service (:8080)<br/>• MDC Correlation Propagation<br/>• Business Operations & Sensitive Masking<br/>• Emits orders-app.jsonl"]
+        OrderDB[("Orders MySQL 8.4<br/>• Internal / Non-Public<br/>• Stores Products, Orders, Items")]
+        FluentBit["Fluent Bit Collector v5.1.5<br/>• Tails access.jsonl & orders-app.jsonl<br/>• In-memory DB offsets<br/>• HTTP Output to Python Collector"]
+    end
+
+    subgraph LogPlatformEC2 ["3. aji-log-investigation-ec2 (Elastic IP: 13.61.239.115)"]
+        PyCollector["Python FastAPI Collector (:8081)<br/>• Normalizes Nginx & Spring Boot schemas<br/>• Enforces UTC timestamps<br/>• Persists to log_records"]
+        LogDB[("Log Platform MySQL 8.4<br/>• log_records & incidents tables")]
+        BackendAPI["Log Investigation Spring Boot API (:8080)<br/>• Exposes logs, timelines, & incident lifecycle"]
+        ReactUI["React + Vite Frontend (:3000 / served via Nginx)<br/>• Incident timeline reconstruction & remediation tracking"]
+        DataPusher["Log Data Pusher Spring Boot Exporter<br/>• Scheduled every 5 mins<br/>• Snowpipe Streaming High-Performance Ingestion"]
+    end
+
+    subgraph SnowflakeCloud ["4. Snowflake Cloud Data Warehouse (LOG_ANALYTICS_DB)"]
+        Bronze["BRONZE Layer (Append-Only Raw)<br/>• BRONZE.LOG_RECORDS & BRONZE.INCIDENTS"]
+        Streams["Snowflake CDC Streams<br/>• LOG_RECORDS_STREAM & INCIDENTS_STREAM"]
+        Tasks["Automated Tasks & DAG Orchestration<br/>• Root Heartbeat (2-min) -> Merge into Silver"]
+        Silver["SILVER Layer (Cleaned & Standardized)<br/>• Deduplication, filter health probes, duration derivation"]
+        Gold["GOLD Layer (Reporting Views)<br/>• Zero-lag analytical models & KPIs"]
+    end
+
+    subgraph AnalyticsLayer ["5. Business Intelligence"]
+        PowerBI["Power BI Desktop (LogPulse_Analytics.pbix)<br/>• Direct Snowflake Import<br/>• Application Health & Incident Analytics Dashboards"]
+    end
+
+    Client -->|HTTP Request| Nginx
+    Nginx -->|Reverse Proxy with X-Correlation-ID| OrdersApp
+    OrdersApp --> OrderDB
+    Nginx -.->|access.jsonl| FluentBit
+    OrdersApp -.->|orders-app.jsonl| FluentBit
+    FluentBit -->|HTTP POST /ingest via VPC Private IP 172.31.16.112:8081| PyCollector
+    PyCollector --> LogDB
+    LogDB <--> BackendAPI
+    BackendAPI <--> ReactUI
+    LogDB --> DataPusher
+    DataPusher -->|Snowpipe Streaming RSA Key-Pair Auth| Bronze
+    Bronze --> Streams
+    Streams --> Tasks
+    Tasks --> Silver
+    Silver --> Gold
+    Gold -->|Import Mode| PowerBI
+    </pre>
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        primaryColor: '#1e3a8a',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#38bdf8',
+        secondaryColor: '#0f766e',
+        tertiaryColor: '#1e293b'
+      }
+    });
+  </script>
+</body>
+</html>
+

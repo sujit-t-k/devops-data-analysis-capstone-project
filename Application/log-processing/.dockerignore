@@ -1,0 +1,15 @@
+mysql-config.env
+source-config.env
+.env
+.env.*
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+.git/
+.idea/
+.vscode/
+
+data/
